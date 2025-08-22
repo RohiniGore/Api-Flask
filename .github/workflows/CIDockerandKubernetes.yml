@@ -1,0 +1,66 @@
+name: CI with Docker and Kubernetes
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKER_USERNAME: ${{ vars.DOCKER_NAME }}
+  DOCKER_PASSWORD: ${{ secrets.NEW_DOCKER_PASSWORD }}
+  DOCKER_IMAGE: rohinigore/my-python-api-flask
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Python and install dependencies
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 3: Log in to Docker Hub
+      - name: Log in to Docker Hub
+        run: |
+          echo "${{ env.DOCKER_PASSWORD }}" | docker login -u "${{ env.DOCKER_USERNAME }}" --password-stdin
+
+      # Step 4: Build Docker image
+      - name: Build Docker image
+        run: docker build -t $DOCKER_IMAGE:latest .
+
+      # Step 5: Push Docker image
+      - name: Push Docker image
+        run: docker push $DOCKER_IMAGE:latest
+
+      # Step 6: Run container locally (test)
+      - name: Run container for testing
+        run: docker run -d --name flask-python -p 5000:5000 $DOCKER_IMAGE:latest
+
+      # Step 7: Setup Kubectl
+      - name: Setup Kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      # Step 8: Setup Minikube
+      - name: Setup Minikube
+        run: |
+          minikube start
+          kubectl config use-context minikube
+
+      # Step 9: Deploy to Kubernetes
+      - name: Deployment K8s
+        run: |
+          kubectl apply -f k8s/deployment.yml
+          kubectl apply -f k8s/service.yml
