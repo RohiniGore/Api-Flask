@@ -1,4 +1,4 @@
-name: CI with Docker
+name: CI with Docker and Kubernetes
 
 on:
  workflow_dispatch
